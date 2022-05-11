@@ -1,8 +1,6 @@
-Trying to organise my downloads into YYYY-MM-DD folders since my browsers don't
+Forked from kaihendry <3
 
-	go install github.com/kaihendry/yyyymmdd/...@latest
-	yes | $(go env GOPATH)/bin/yyyymmdd ~/Downloads
-
-
-
-[![Organise Downloads](http://img.youtube.com/vi/CYgu-N2xkwI/0.jpg)](http://www.youtube.com/watch?v=CYgu-N2xkwI "How to organise ~/Downloads")
+Changed from kai's repo:
+- Current directory as default, not required arg.
+- Remove y/n question for moving files.
+- Concurrency moving each file.

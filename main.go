@@ -6,71 +6,75 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
-
-const version = "0.0.1"
 
 func main() {
 
-	fmt.Printf("%s, version %s\n", filepath.Base(os.Args[0]), version)
+	var dir string
 
 	if len(os.Args) != 2 {
-		log.Fatalf("No directory specified")
+		dir, _ = os.Getwd()
+	} else {
+		dir = os.Args[1]
 	}
 
-	dir := os.Args[1]
 	log.Printf("Organising %s", dir)
 	files, err := os.ReadDir(dir)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
+	wg := sync.WaitGroup{}
+	wg.Add(len(files))
 
-		fullPath, err := filepath.Abs(filepath.Join(dir, file.Name()))
-		if err != nil {
-			log.Fatal(err)
-		}
+	for _, f := range files {
+		go func(wg *sync.WaitGroup, dir string, file os.DirEntry) {
+			defer wg.Done()
+			moveFile(dir, file)
+		}(&wg, dir, f)
+	}
 
-		// ignore files starting with .
-		if strings.HasPrefix(file.Name(), ".") {
-			log.Printf("Ignoring dot file %s", fullPath)
-			continue
-		}
+	wg.Wait()
 
-		containingFolder := filepath.Base(filepath.Dir(fullPath))
+	fmt.Println("All files moved")
+	os.Exit(1)
+}
 
-		fileInfo, err := file.Info()
-		if err != nil {
-			log.Fatal(err)
-		}
+func moveFile(dir string, file os.DirEntry) {
+	if file.IsDir() {
+		return
+	}
 
-		yyyymmdd := fileInfo.ModTime().Format("2006-01-02")
-		if yyyymmdd != containingFolder {
-			log.Printf("%s is not in the right folder: %s", fullPath, yyyymmdd)
-		}
+	fullPath, err := filepath.Abs(filepath.Join(dir, file.Name()))
 
-		// new path in "yyyy-mm-dd" folder
-		newPath := filepath.Join(dir, yyyymmdd)
-		newFullPath := filepath.Join(newPath, file.Name())
+	if err != nil {
+		log.Fatal(err)
+	}
 
-		// prompt user to move file
-		fmt.Printf("Move %s to %s? (y/n) ", fullPath, newFullPath)
-		var answer string
-		fmt.Scanln(&answer)
-		if strings.ToLower(strings.TrimSpace(answer)) == "y" {
-			err = os.MkdirAll(newPath, 0755)
-			if err != nil {
-				log.Fatal(err)
-			}
+	if strings.HasPrefix(file.Name(), ".") {
+		return
+	}
 
-			err = os.Rename(fullPath, newFullPath)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
+	fileInfo, err := file.Info()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	yyyymmdd := fileInfo.ModTime().Format("2006-01-02")
+
+	// new path in "yyyy-mm-dd" folder
+	newPath := filepath.Join(dir, yyyymmdd)
+	newFullPath := filepath.Join(newPath, file.Name())
+
+	err = os.MkdirAll(newPath, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = os.Rename(fullPath, newFullPath)
+	if err != nil {
+		log.Fatal(err)
 	}
 }
